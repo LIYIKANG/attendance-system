@@ -102,6 +102,19 @@ function statusPill(status) {
   return `<span class="pill ${meta.cls}">${meta.label}</span>`;
 }
 
+function dutyStatus(record) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (record.clockOut) return { label: '已下班', cls: 'duty-off' };
+  if (record.date === today) return { label: '在岗中', cls: 'duty-on' };
+  return { label: '未打下班卡', cls: 'duty-missing' };
+}
+
+function dutyPill(record) {
+  const meta = dutyStatus(record);
+  const dot = meta.cls === 'duty-on' ? '<span class="duty-dot"></span>' : '';
+  return `<span class="pill ${meta.cls}">${dot}${meta.label}</span>`;
+}
+
 function employeeName(id) {
   const employee = state.employees.find((item) => item.id === id);
   if (employee) return employee.name;
@@ -405,25 +418,31 @@ function renderCalendarDetail() {
     return;
   }
 
+  const onDutyCount = dayRecords.filter((record) => dutyStatus(record).cls === 'duty-on').length;
+
   const rows = dayRecords
     .sort((a, b) => new Date(a.clockIn || 0) - new Date(b.clockIn || 0))
     .map(
       (record) => `
         <tr>
           <td>${record.name || employeeName(record.employeeId)}</td>
+          <td>${record.department || '-'}</td>
           <td>${formatTime(record.clockIn)}</td>
           <td>${formatTime(record.clockOut)}</td>
+          <td>${dutyPill(record)}</td>
           <td>${statusPill(record.status)}</td>
         </tr>`
     )
     .join('');
 
+  const onDutyBadge = onDutyCount ? `，<span class="on-duty-hint"><span class="duty-dot"></span>在岗 ${onDutyCount} 人</span>` : '';
+
   elements.calendarDetail.innerHTML = `
-    <h3>${title}（共 ${dayRecords.length} 人）</h3>
+    <h3>${title}（共 ${dayRecords.length} 人${onDutyBadge}）</h3>
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>员工</th><th>上班时间</th><th>下班时间</th><th>状态</th></tr>
+          <tr><th>员工</th><th>部门</th><th>上班时间</th><th>下班时间</th><th>在岗状态</th><th>打卡状态</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
