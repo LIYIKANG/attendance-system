@@ -28,7 +28,7 @@ cp .env.example .env
 npm start
 ```
 
-打开 http://localhost:3000 ，默认管理员：`admin` / `Admin@123`。
+打开 http://localhost:3000 
 
 未配置 MySQL 时会自动使用 `data/db.json` 存储，首次启动自动生成示例数据。
 
