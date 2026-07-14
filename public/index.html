@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>员工打卡管理系统</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-logo">🕐</span>
+          <span class="brand-name">企业打卡系统</span>
+        </div>
+        <div id="userBadge" class="user-badge"></div>
+        <nav id="navMenu">
+          <a href="#dashboard" class="nav-item active" data-target="dashboard"><span class="nav-ico">📊</span>数据概览</a>
+          <a href="#records" class="nav-item" data-target="records"><span class="nav-ico">✅</span>员工打卡</a>
+          <a href="#calendar" class="nav-item" data-target="calendar"><span class="nav-ico">🗓️</span>考勤日历</a>
+          <a href="#employees" class="nav-item" data-target="employees"><span class="nav-ico">👥</span>员工管理</a>
+          <a href="#summary" class="nav-item" data-target="summary"><span class="nav-ico">📅</span>月度总结</a>
+          <a href="#settings" class="nav-item" data-target="settings"><span class="nav-ico">⚙️</span>系统设置</a>
+        </nav>
+        <button id="logoutBtn" class="logout-btn">退出登录</button>
+      </aside>
+
+      <main class="main-content">
+        <section id="dashboard" class="panel view active">
+          <div class="panel-head">
+            <div>
+              <h2>数据概览</h2>
+              <p class="panel-sub">实时了解今日出勤与团队状态</p>
+            </div>
+            <div class="top-actions">
+              <input id="monthInput" type="month" />
+              <button id="refreshSummaryBtn" class="btn-ghost">刷新</button>
+              <button id="exportExcelBtn" class="btn-ghost">导出 Excel</button>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-label">今日打卡人数</span>
+              <strong id="todayRecords">0</strong>
+              <span class="stat-ico">✅</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">在职员工</span>
+              <strong id="activeEmployees">0</strong>
+              <span class="stat-ico">👥</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">今日迟到</span>
+              <strong id="lateCount">0</strong>
+              <span class="stat-ico">⏰</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">本月工资合计</span>
+              <strong id="totalSalary">0</strong>
+              <span class="stat-ico">💰</span>
+            </div>
+          </div>
+
+          <div class="chart-grid">
+            <div class="chart-card">
+              <h3>打卡状态分布</h3>
+              <div id="statusChart" class="chart-body"></div>
+            </div>
+            <div class="chart-card">
+              <h3 id="deptChartTitle">各部门人数</h3>
+              <div id="deptChart" class="chart-body"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="records" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>员工打卡</h2>
+              <p class="panel-sub">选择员工完成上下班打卡</p>
+            </div>
+          </div>
+
+          <div class="employee-punch-row">
+            <select id="employeeSelect"></select>
+            <button id="clockInBtn" class="btn-success">上班打卡</button>
+            <button id="clockOutBtn" class="btn-warning">下班打卡</button>
+          </div>
+
+          <div id="clockFeedback" class="feedback-box">请选择员工并进行打卡。</div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>员工</th>
+                  <th>日期</th>
+                  <th>上班时间</th>
+                  <th>下班时间</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody id="recordTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="calendar" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>考勤日历</h2>
+              <p class="panel-sub">查看每天的打卡时间与状态，点击日期查看明细</p>
+            </div>
+            <div class="cal-toolbar">
+              <button id="calPrev" class="btn-ghost">‹ 上月</button>
+              <strong id="calLabel"></strong>
+              <button id="calNext" class="btn-ghost">下月 ›</button>
+            </div>
+          </div>
+
+          <div class="cal-legend">
+            <span class="legend-item"><span class="cal-dot" style="background:#0ca30c"></span>正常</span>
+            <span class="legend-item"><span class="cal-dot" style="background:#d03b3b"></span>迟到</span>
+            <span class="legend-item"><span class="cal-dot" style="background:#eda100"></span>早退</span>
+          </div>
+
+          <div id="calendarGrid" class="calendar-grid"></div>
+          <div id="calendarDetail" class="calendar-detail"></div>
+        </section>
+
+        <section id="employees" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>员工管理</h2>
+              <p class="panel-sub">添加员工并为其创建登录账户</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>姓名</label>
+              <input id="name" placeholder="请输入姓名" />
+            </div>
+            <div class="form-group">
+              <label>部门</label>
+              <input id="department" placeholder="例如：研发部" />
+            </div>
+            <div class="form-group">
+              <label>岗位</label>
+              <input id="position" placeholder="例如：前端工程师" />
+            </div>
+            <div class="form-group">
+              <label>用工类型</label>
+              <select id="employmentType">
+                <option value="parttime">兼职（按天结算）</option>
+                <option value="fulltime">全职（按月结算）</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label id="salaryLabel">每日工资（元/天）</label>
+              <input id="baseSalary" type="number" placeholder="请输入每日工资" />
+            </div>
+            <div class="form-group">
+              <label>电话</label>
+              <input id="phone" placeholder="13800000000" />
+            </div>
+            <div class="form-group">
+              <label>入职日期</label>
+              <input id="hireDate" type="date" />
+            </div>
+            <div class="form-group account-field">
+              <label>登录用户名</label>
+              <input id="username" placeholder="用于登录，留空自动生成" />
+            </div>
+            <div class="form-group account-field">
+              <label>登录密码</label>
+              <input id="password" type="password" placeholder="默认 123456" />
+            </div>
+          </div>
+
+          <p id="accountHint" class="field-hint">💡 用户名与密码用于该员工登录系统。编辑现有员工时，账户信息不会被修改。</p>
+
+          <div class="button-row">
+            <button id="addEmployeeBtn">添加员工</button>
+            <button id="resetEmployeeFormBtn" class="btn-ghost">重置</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>姓名</th>
+                  <th>部门</th>
+                  <th>岗位</th>
+                  <th>用工类型</th>
+                  <th>工资</th>
+                  <th>电话</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="employeeTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="summary" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>月度总结</h2>
+              <p class="panel-sub">按月统计出勤与薪资</p>
+            </div>
+          </div>
+          <div class="chart-card full">
+            <h3>各员工出勤率</h3>
+            <div id="summaryChart" class="chart-body"></div>
+          </div>
+          <div id="summaryTableContainer" class="table-wrap"></div>
+        </section>
+
+        <section id="settings" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>系统设置</h2>
+              <p class="panel-sub">配置考勤时间与扣款规则</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>上班时间</label>
+              <input id="workStart" type="time" />
+            </div>
+            <div class="form-group">
+              <label>下班时间</label>
+              <input id="workEnd" type="time" />
+            </div>
+            <div class="form-group">
+              <label>缺勤扣款（每人/天）</label>
+              <input id="deductPerAbsentDay" type="number" />
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button id="saveSettingsBtn">保存设置</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="/public/app.js"></script>
+  </body>
+</html>

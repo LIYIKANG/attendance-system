@@ -1,0 +1,23 @@
+{
+  "name": "attendance-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server-enterprise.js",
+    "dev": "npx -y node@20 server-enterprise.js"
+  },
+  "engines": {
+    "node": ">=20 <23"
+  },
+  "dependencies": {
+    "@adminjs/express": "^5.1.0",
+    "@adminjs/sequelize": "^2.1.0",
+    "adminjs": "^7.3.0",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "mysql2": "^3.22.6",
+    "sequelize": "^6.37.8",
+    "xlsx": "^0.18.5"
+  }
+}

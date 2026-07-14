@@ -1,0 +1,14 @@
+# 依赖
+node_modules/
+
+# 环境变量（含密钥，切勿提交）
+.env
+.env.bak
+
+# 本地数据（含员工信息与密码散列，不提交到仓库）
+data/db.json
+
+# 日志与系统文件
+*.log
+npm-debug.log*
+.DS_Store

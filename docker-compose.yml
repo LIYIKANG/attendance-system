@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    container_name: attendance-system
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      # 容器内通过服务名 db 连接数据库（覆盖 .env 里的 localhost）
+      DB_HOST: db
+      NODE_ENV: production
+    volumes:
+      # 持久化 JSON 兜底存储（MySQL 不可用时使用）
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: attendance-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-attendance_db}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123456}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  db_data:
