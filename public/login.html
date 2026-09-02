@@ -4,103 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>企业打卡系统 · 登录</title>
-    <style>
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #0f172a 0%, #1c5cab 60%, #2a78d6 100%);
-        color: #fff;
-        font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-        padding: 20px;
-      }
-
-      .login-card {
-        width: 100%;
-        max-width: 400px;
-        padding: 36px 32px;
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-      }
-
-      .login-logo { font-size: 40px; text-align: center; }
-
-      h2 {
-        margin: 8px 0 4px;
-        text-align: center;
-        font-size: 24px;
-      }
-
-      .note {
-        font-size: 13px;
-        opacity: 0.85;
-        text-align: center;
-        margin-bottom: 26px;
-      }
-
-      label {
-        display: block;
-        font-size: 13px;
-        opacity: 0.9;
-        margin-bottom: 6px;
-      }
-
-      input {
-        width: 100%;
-        padding: 13px 14px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.12);
-        color: #fff;
-        margin-bottom: 18px;
-        font-size: 15px;
-        transition: border-color 0.15s ease, background 0.15s ease;
-      }
-
-      input::placeholder { color: rgba(255, 255, 255, 0.6); }
-
-      input:focus {
-        outline: none;
-        border-color: #fff;
-        background: rgba(255, 255, 255, 0.2);
-      }
-
-      button {
-        width: 100%;
-        padding: 14px;
-        border-radius: 12px;
-        border: none;
-        background: #fff;
-        color: #1c5cab;
-        cursor: pointer;
-        font-weight: 700;
-        font-size: 15px;
-        transition: transform 0.1s ease, opacity 0.15s ease;
-      }
-
-      button:hover { opacity: 0.92; }
-      button:active { transform: scale(0.98); }
-
-      #loginFeedback {
-        margin-top: 14px;
-        text-align: center;
-        font-size: 13.5px;
-        min-height: 18px;
-        color: #fecaca;
-      }
-    </style>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="login-page">
     <form class="login-card" id="loginForm">
       <div class="login-logo">🕐</div>
-      <h2>企业打卡系统</h2>
-      <div class="note">请输入您的账号登录</div>
+      <h1>企业打卡系统</h1>
+      <p class="login-note">请输入您的账号登录</p>
 
       <label for="username">用户名</label>
       <input id="username" placeholder="请输入用户名" autocomplete="username" />
@@ -108,36 +18,10 @@
       <label for="password">密码</label>
       <input id="password" type="password" placeholder="请输入密码" autocomplete="current-password" />
 
-      <button type="submit" id="loginBtn">登 录</button>
-      <div id="loginFeedback"></div>
+      <button type="submit" id="loginBtn">登录</button>
+      <div id="loginFeedback" class="login-feedback" role="status"></div>
     </form>
 
-    <script>
-      const form = document.querySelector('#loginForm');
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const feedback = document.querySelector('#loginFeedback');
-        const username = document.querySelector('#username').value.trim();
-        const password = document.querySelector('#password').value;
-        feedback.textContent = '登录中…';
-        try {
-          const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-          });
-          const data = await response.json();
-          if (!response.ok) {
-            feedback.textContent = data.message === 'Invalid username or password' ? '用户名或密码错误' : (data.message || '登录失败');
-            return;
-          }
-          localStorage.setItem('attendance-token', data.token);
-          localStorage.setItem('attendance-user', JSON.stringify(data.user));
-          window.location.href = '/';
-        } catch (error) {
-          feedback.textContent = '网络错误，请重试';
-        }
-      });
-    </script>
+    <script src="./login.js"></script>
   </body>
 </html>

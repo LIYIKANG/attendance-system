@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>员工打卡管理系统</title>
-    <link rel="stylesheet" href="/public/styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -15,18 +15,23 @@
         </div>
         <div id="userBadge" class="user-badge"></div>
         <nav id="navMenu">
-          <a href="#dashboard" class="nav-item active" data-target="dashboard"><span class="nav-ico">📊</span>数据概览</a>
-          <a href="#records" class="nav-item" data-target="records"><span class="nav-ico">✅</span>员工打卡</a>
-          <a href="#calendar" class="nav-item" data-target="calendar"><span class="nav-ico">🗓️</span>考勤日历</a>
-          <a href="#employees" class="nav-item" data-target="employees"><span class="nav-ico">👥</span>员工管理</a>
-          <a href="#summary" class="nav-item" data-target="summary"><span class="nav-ico">📅</span>月度总结</a>
-          <a href="#settings" class="nav-item" data-target="settings"><span class="nav-ico">⚙️</span>系统设置</a>
+          <a href="#dashboard" class="nav-item" data-target="dashboard" data-access="admin"><span class="nav-ico">📊</span>数据概览</a>
+          <a href="#records" class="nav-item active" data-target="records" data-access="all"><span class="nav-ico">✅</span>打卡</a>
+          <a href="#history" class="nav-item" data-target="history" data-access="all"><span class="nav-ico">🕘</span>历史记录</a>
+          <a href="#changes" class="nav-item" data-target="changes" data-access="leaders"><span class="nav-ico">🔔</span>修改上报 <span id="changeBadge" class="nav-badge hidden-by-role">0</span></a>
+          <a href="#calendar" class="nav-item" data-target="calendar" data-access="admin"><span class="nav-ico">🗓️</span>考勤日历</a>
+          <a href="#employees" class="nav-item" data-target="employees" data-access="admin"><span class="nav-ico">👥</span>员工管理</a>
+          <a href="#summary" class="nav-item" data-target="summary" data-access="admin"><span class="nav-ico">📅</span>月度总结</a>
+          <a href="#settings" class="nav-item" data-target="settings" data-access="admin"><span class="nav-ico">⚙️</span>系统设置</a>
         </nav>
-        <button id="logoutBtn" class="logout-btn">退出登录</button>
+        <div class="sidebar-actions">
+          <button id="changePasswordBtn" class="password-btn">修改密码</button>
+          <button id="logoutBtn" class="logout-btn">退出登录</button>
+        </div>
       </aside>
 
       <main class="main-content">
-        <section id="dashboard" class="panel view active">
+        <section id="dashboard" class="panel view">
           <div class="panel-head">
             <div>
               <h2>数据概览</h2>
@@ -74,36 +79,59 @@
           </div>
         </section>
 
-        <section id="records" class="panel view">
+        <section id="records" class="panel view active punch-panel">
           <div class="panel-head">
             <div>
-              <h2>员工打卡</h2>
-              <p class="panel-sub">选择员工完成上下班打卡</p>
+              <h2>今日打卡</h2>
+              <p class="panel-sub" id="todayLabel">专注当下，记录每一段认真工作的时间</p>
             </div>
           </div>
 
-          <div class="employee-punch-row">
+          <div id="adminEmployeePicker" class="employee-punch-row hidden-by-role">
+            <label for="employeeSelect">代员工打卡</label>
             <select id="employeeSelect"></select>
-            <button id="clockInBtn" class="btn-success">上班打卡</button>
-            <button id="clockOutBtn" class="btn-warning">下班打卡</button>
           </div>
 
-          <div id="clockFeedback" class="feedback-box">请选择员工并进行打卡。</div>
+          <div class="punch-stage">
+            <div id="liveClock" class="live-clock">--:--:--</div>
+            <div id="workState" class="work-state">今天尚未开始工作</div>
+            <div class="punch-actions" aria-label="打卡操作">
+              <button id="clockInBtn" class="punch-btn punch-start"><span class="punch-icon">▶</span><span id="clockInLabel">上班</span></button>
+              <button id="breakBtn" class="punch-btn punch-break"><span class="punch-icon">☕</span><span>休息</span></button>
+              <button id="clockOutBtn" class="punch-btn punch-out"><span class="punch-icon">■</span><span>下班</span></button>
+            </div>
+            <div id="clockFeedback" class="clock-feedback">准备好后，点击“上班”开始今天的工作。</div>
+          </div>
 
+          <div class="today-timeline-card">
+            <h3>今日时间线</h3>
+            <div id="todayTimeline" class="today-timeline"><span class="empty-state">暂无打卡记录</span></div>
+          </div>
+        </section>
+
+        <section id="history" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>历史记录</h2>
+              <p class="panel-sub">查看并修正自己的考勤；每次修改都会永久留痕并上报直属上级</p>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>员工</th>
-                  <th>日期</th>
-                  <th>上班时间</th>
-                  <th>下班时间</th>
-                  <th>状态</th>
-                </tr>
-              </thead>
+              <thead><tr><th>员工</th><th>日期</th><th>上班</th><th>休息</th><th>下班</th><th>状态</th><th>操作</th></tr></thead>
               <tbody id="recordTableBody"></tbody>
             </table>
           </div>
+        </section>
+
+        <section id="changes" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>考勤修改上报</h2>
+              <p class="panel-sub">查看团队成员对日期、上下班和休息时间的修改记录</p>
+            </div>
+          </div>
+          <div id="changeList" class="change-list"></div>
         </section>
 
         <section id="calendar" class="panel view">
@@ -151,6 +179,19 @@
               <input id="position" placeholder="例如：前端工程师" />
             </div>
             <div class="form-group">
+              <label>员工等级</label>
+              <select id="employeeLevel">
+                <option value="employee">员工</option>
+                <option value="project_manager">项目管理人</option>
+                <option value="manager">管理者</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>直属上级（考勤修改接收人）</label>
+              <select id="employeeSupervisor"></select>
+              <span id="supervisorHint" class="field-hint"></span>
+            </div>
+            <div class="form-group">
               <label>用工类型</label>
               <select id="employmentType">
                 <option value="parttime">兼职（按天结算）</option>
@@ -159,7 +200,7 @@
             </div>
             <div class="form-group">
               <label id="salaryLabel">每日工资（元/天）</label>
-              <input id="baseSalary" type="number" placeholder="请输入每日工资" />
+              <input id="baseSalary" type="number" min="0" step="0.01" placeholder="请输入每日工资" />
             </div>
             <div class="form-group">
               <label>电话</label>
@@ -171,15 +212,15 @@
             </div>
             <div class="form-group account-field">
               <label>登录用户名</label>
-              <input id="username" placeholder="用于登录，留空自动生成" />
+              <input id="username" placeholder="用于登录，留空自动生成" autocomplete="off" />
             </div>
             <div class="form-group account-field">
               <label>登录密码</label>
-              <input id="password" type="password" placeholder="默认 123456" />
+              <input id="password" type="password" placeholder="至少 8 位，包含字母和数字" autocomplete="new-password" />
             </div>
           </div>
 
-          <p id="accountHint" class="field-hint">💡 用户名与密码用于该员工登录系统。编辑现有员工时，账户信息不会被修改。</p>
+          <p id="accountHint" class="field-hint">💡 汇报链路：员工 → 项目管理人 → 管理者 → 系统管理员。编辑现有员工时，账户信息不会被修改。</p>
 
           <div class="button-row">
             <button id="addEmployeeBtn">添加员工</button>
@@ -193,6 +234,8 @@
                   <th>姓名</th>
                   <th>部门</th>
                   <th>岗位</th>
+                  <th>员工等级</th>
+                  <th>考勤修改上报给</th>
                   <th>用工类型</th>
                   <th>工资</th>
                   <th>电话</th>
@@ -244,12 +287,58 @@
           <div class="button-row">
             <button id="saveSettingsBtn">保存设置</button>
           </div>
+
+          <div class="settings-divider"></div>
+          <div class="panel-head compact">
+            <div>
+              <h3>员工等级与汇报关系</h3>
+              <p class="panel-sub">汇报链路：员工 → 项目管理人 → 管理者 → 系统管理员</p>
+            </div>
+            <button id="saveHierarchyBtn">保存组织关系</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>员工</th><th>部门</th><th>等级</th><th>直属上级</th><th>配置状态</th></tr></thead>
+              <tbody id="hierarchyTableBody"></tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>
 
     <div id="toast" class="toast"></div>
 
-    <script src="/public/app.js"></script>
+    <div id="editRecordModal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editRecordTitle">
+        <div class="modal-head">
+          <div><h3 id="editRecordTitle">修改考勤记录</h3><p>原始内容会保留，并自动上报直属上级。</p></div>
+          <button id="closeEditModal" class="modal-close" aria-label="关闭">×</button>
+        </div>
+        <div class="edit-grid">
+          <div class="form-group"><label>日期</label><input id="editDate" type="date" /></div>
+          <div class="form-group"><label>上班时间</label><input id="editClockIn" type="datetime-local" /></div>
+          <div class="form-group"><label>下班时间</label><input id="editClockOut" type="datetime-local" /></div>
+        </div>
+        <div class="break-editor-head"><strong>休息时段</strong><button id="addBreakRow" class="btn-ghost action-btn">添加休息</button></div>
+        <div id="breakEditor" class="break-editor"></div>
+        <div class="form-group"><label>修改原因（必填）</label><textarea id="editReason" rows="3" placeholder="例如：忘记及时打卡，由现场记录核对后修正"></textarea></div>
+        <div class="modal-actions"><button id="cancelEditRecord" class="btn-ghost">取消</button><button id="saveRecordEdit">提交修改并上报</button></div>
+      </div>
+    </div>
+
+    <div id="passwordModal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card password-card" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+        <div class="modal-head">
+          <div><h3 id="passwordModalTitle">修改登录密码</h3><p>新密码至少 8 位，并同时包含字母和数字。</p></div>
+          <button id="closePasswordModal" class="modal-close" aria-label="关闭">×</button>
+        </div>
+        <div class="form-group"><label for="currentPassword">当前密码</label><input id="currentPassword" type="password" autocomplete="current-password" /></div>
+        <div class="form-group"><label for="newPassword">新密码</label><input id="newPassword" type="password" autocomplete="new-password" /></div>
+        <div class="form-group"><label for="confirmPassword">确认新密码</label><input id="confirmPassword" type="password" autocomplete="new-password" /></div>
+        <div class="modal-actions"><button id="cancelPasswordChange" class="btn-ghost">取消</button><button id="savePasswordChange">保存新密码</button></div>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
   </body>
 </html>

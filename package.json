@@ -5,19 +5,21 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server-enterprise.js",
-    "dev": "npx -y node@20 server-enterprise.js"
+    "dev": "npx -y node@20 server-enterprise.js",
+    "check": "node --check server-enterprise.js && node --check public/app.js && node --check public/login.js && bash -n deploy.sh"
   },
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=20"
   },
   "dependencies": {
-    "@adminjs/express": "^5.1.0",
-    "@adminjs/sequelize": "^2.1.0",
-    "adminjs": "^7.3.0",
     "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "mysql2": "^3.22.6",
-    "sequelize": "^6.37.8",
-    "xlsx": "^0.18.5"
+    "sequelize": "^6.37.8"
+  },
+  "overrides": {
+    "brace-expansion": "^2.1.4",
+    "uuid": "^11.1.1"
   }
 }
