@@ -82,6 +82,14 @@ const elements = {
   adminEmployeePicker: $('#adminEmployeePicker'),
   recordTableBody: $('#recordTableBody'),
   hierarchyTableBody: $('#hierarchyTableBody'),
+  organizationTree: $('#organizationTree'),
+  organizationUnassigned: $('#organizationUnassigned'),
+  orgManagerCount: $('#orgManagerCount'),
+  orgProjectCount: $('#orgProjectCount'),
+  orgEmployeeCount: $('#orgEmployeeCount'),
+  orgConfiguredCount: $('#orgConfiguredCount'),
+  refreshOrganizationBtn: $('#refreshOrganizationBtn'),
+  editOrganizationBtn: $('#editOrganizationBtn'),
   changeList: $('#changeList'),
   changeBadge: $('#changeBadge'),
   clockFeedback: $('#clockFeedback'),
@@ -384,6 +392,98 @@ function renderEmployees() {
   }).join('') : '<tr><td colspan="10" class="empty-cell">暂无员工</td></tr>';
   elements.employeeSelect.innerHTML = state.employees.map(employee => `<option value="${employee.id}">${escapeHtml(employee.name)}（${escapeHtml(employee.department || '—')}）</option>`).join('');
   renderEmployeeSupervisorOptions(elements.employeeSupervisor.value);
+  renderOrganizationChart();
+}
+
+function organizationNode(employee, directReportCount = 0) {
+  const level = employee.level || 'employee';
+  const meta = LEVEL_META[level] || LEVEL_META.employee;
+  const initials = String(employee.name || '员').trim().slice(-2);
+  const details = [ employee.department, employee.position ].filter(Boolean).map(escapeHtml).join(' · ') || '暂未填写部门与岗位';
+  return `<article class="org-node org-node-${level}">
+    <div class="org-node-avatar">${escapeHtml(initials)}</div>
+    <div class="org-node-body">
+      <span class="org-node-role">${escapeHtml(meta.label)}</span>
+      <strong>${escapeHtml(employee.name)}</strong>
+      <small>${details}</small>
+      ${directReportCount ? `<span class="org-report-count">直属 ${directReportCount} 人</span>` : ''}
+    </div>
+  </article>`;
+}
+
+function organizationBranch(employee, children = []) {
+  return `<li>${organizationNode(employee, children.length)}${children.length ? `<ul>${children.join('')}</ul>` : ''}</li>`;
+}
+
+function renderOrganizationChart() {
+  if (!elements.organizationTree) return;
+
+  const employees = state.employees.map(employee => ({
+    ...employee,
+    id: Number(employee.id),
+    supervisorId: employee.supervisorId == null ? null : Number(employee.supervisorId),
+    level: employee.level || 'employee'
+  }));
+  const employeeById = new Map(employees.map(employee => [ employee.id, employee ]));
+  const managers = employees.filter(employee => employee.level === 'manager');
+  const projectManagers = employees.filter(employee => employee.level === 'project_manager');
+  const teamMembers = employees.filter(employee => employee.level === 'employee');
+  const connectedIds = new Set(managers.map(employee => employee.id));
+
+  const managerBranches = managers.map(manager => {
+    const managerProjects = projectManagers.filter(employee => employee.supervisorId === manager.id);
+    managerProjects.forEach(employee => connectedIds.add(employee.id));
+    const projectBranches = managerProjects.map(projectManager => {
+      const members = teamMembers.filter(employee => employee.supervisorId === projectManager.id);
+      members.forEach(employee => connectedIds.add(employee.id));
+      return organizationBranch(projectManager, members.map(employee => organizationBranch(employee)));
+    });
+    return organizationBranch(manager, projectBranches);
+  });
+
+  elements.orgManagerCount.textContent = managers.length;
+  elements.orgProjectCount.textContent = projectManagers.length;
+  elements.orgEmployeeCount.textContent = teamMembers.length;
+  elements.orgConfiguredCount.textContent = connectedIds.size;
+
+  const adminName = state.user?.fullName || '系统管理员';
+  const rootNode = `<article class="org-node org-node-admin">
+    <div class="org-node-avatar">管</div>
+    <div class="org-node-body">
+      <span class="org-node-role">系统管理员</span>
+      <strong>${escapeHtml(adminName)}</strong>
+      <small>组织架构顶层 · 管理全部人员</small>
+      ${managers.length ? `<span class="org-report-count">直属 ${managers.length} 人</span>` : ''}
+    </div>
+  </article>`;
+
+  elements.organizationTree.innerHTML = `<div class="org-tree">
+    <ul><li>${rootNode}${managerBranches.length ? `<ul>${managerBranches.join('')}</ul>` : ''}</li></ul>
+  </div>${managers.length ? '' : '<div class="org-tree-empty">尚未设置管理者，请先到“系统设置”配置组织关系。</div>'}`;
+  requestAnimationFrame(() => {
+    elements.organizationTree.scrollLeft = Math.max((elements.organizationTree.scrollWidth - elements.organizationTree.clientWidth) / 2, 0);
+  });
+
+  const unassigned = employees.filter(employee => !connectedIds.has(employee.id));
+  if (!unassigned.length) {
+    elements.organizationUnassigned.innerHTML = '<div class="org-complete"><span>✓</span><div><strong>组织关系已完整配置</strong><p>所有人员都已纳入正确的汇报链路。</p></div></div>';
+    return;
+  }
+
+  const unassignedCards = unassigned.map(employee => {
+    const supervisor = employeeById.get(employee.supervisorId);
+    const requiredLevel = requiredSupervisorLevel(employee.level);
+    const reason = !employee.supervisorId
+      ? `尚未选择${LEVEL_META[requiredLevel]?.label || '直属上级'}`
+      : !supervisor
+        ? '原直属上级已不存在'
+        : `直属上级应为${LEVEL_META[requiredLevel]?.label || '正确等级'}`;
+    return `<div class="org-unassigned-card">
+      <div class="org-unassigned-avatar">${escapeHtml(String(employee.name || '员').trim().slice(-2))}</div>
+      <div><strong>${escapeHtml(employee.name)}</strong><span>${escapeHtml((LEVEL_META[employee.level] || LEVEL_META.employee).label)} · ${escapeHtml(employee.department || '未分组')}</span><small>${escapeHtml(reason)}</small></div>
+    </div>`;
+  }).join('');
+  elements.organizationUnassigned.innerHTML = `<div class="org-unassigned-head"><div><h3>待配置人员</h3><p>以下人员尚未接入完整汇报链路，考勤修改可能无法正常上报。</p></div><span>${unassigned.length} 人</span></div><div class="org-unassigned-grid">${unassignedCards}</div>`;
 }
 
 function renderRecords() {
@@ -571,10 +671,11 @@ function renderCalendarDetail() {
 
 async function loadEmployees() {
   const data = await fetchJson('/api/employees');
-  if (!data) return;
+  if (!data) return false;
   state.employees = data.employees;
   renderEmployees();
   renderHierarchy();
+  return true;
 }
 
 async function loadRecords() {
@@ -939,9 +1040,14 @@ elements.navMenu.addEventListener('click', event => {
   switchView(link.dataset.target);
   history.replaceState(null, '', `#${link.dataset.target}`);
   if (link.dataset.target === 'changes') loadChanges();
+  if (link.dataset.target === 'organization' && isAdmin()) loadEmployees();
 });
 
-window.addEventListener('hashchange', () => switchView(location.hash.slice(1)));
+window.addEventListener('hashchange', () => {
+  const target = location.hash.slice(1);
+  switchView(target);
+  if (target === 'organization' && isAdmin()) loadEmployees();
+});
 
 elements.logoutBtn.addEventListener('click', () => {
   localStorage.removeItem('attendance-token');
@@ -1029,6 +1135,19 @@ elements.saveRecordEdit.addEventListener('click', saveRecordEdit);
 elements.saveSettingsBtn.addEventListener('click', saveSettings);
 
 elements.saveHierarchyBtn.addEventListener('click', saveHierarchy);
+
+elements.refreshOrganizationBtn.addEventListener('click', async () => {
+  if (await loadEmployees()) showToast('组织架构已刷新');
+});
+
+elements.editOrganizationBtn.addEventListener('click', () => {
+  switchView('settings');
+  history.replaceState(null, '', '#settings');
+  requestAnimationFrame(() => elements.hierarchyTableBody.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  }));
+});
 
 elements.hierarchyTableBody.addEventListener('change', event => {
   if (event.target.dataset.field === 'level') renderHierarchy(collectHierarchyDraft());

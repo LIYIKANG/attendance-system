@@ -948,6 +948,211 @@ tbody tr:last-child td {
 .document-action { position: relative; white-space: nowrap; }
 .document-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 5px; padding: 0 5px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 11px; }
 
+/* ---------- Organization chart ---------- */
+.org-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.org-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fff, #f8fafd);
+}
+
+.org-stat-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.org-stat-icon.manager { color: #7c3aed; background: #f1eafd; }
+.org-stat-icon.project { color: #1470c9; background: #e7f2ff; }
+.org-stat-icon.employee { color: #07846e; background: #e3f7f2; }
+.org-stat-icon.configured { color: #15803d; background: #e4f5e9; }
+.org-stat-card div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.org-stat-card strong { font-size: 22px; line-height: 1.1; }
+.org-stat-card div span { overflow: hidden; color: var(--text-soft); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.org-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 12px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.org-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.org-legend i { width: 9px; height: 9px; border-radius: 50%; }
+.org-legend i.admin { background: #0f172a; }
+.org-legend i.manager { background: #7c3aed; }
+.org-legend i.project { background: #2a78d6; }
+.org-legend i.employee { background: #0f9f86; }
+
+.organization-tree-wrap {
+  position: relative;
+  min-height: 260px;
+  overflow-x: auto;
+  padding: 34px 24px 30px;
+  border: 1px solid #dfe7f2;
+  border-radius: 18px;
+  background-color: #f8fafd;
+  background-image: radial-gradient(#d6e0ed 0.8px, transparent 0.8px);
+  background-size: 18px 18px;
+}
+
+.org-tree {
+  width: max-content;
+  min-width: 100%;
+  text-align: center;
+}
+
+.org-tree ul {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 30px 0 0;
+}
+
+.org-tree > ul { padding-top: 0; }
+.org-tree li {
+  position: relative;
+  padding: 30px 9px 0;
+  list-style: none;
+  text-align: center;
+}
+
+.org-tree > ul > li { padding-top: 0; }
+.org-tree li::before,
+.org-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 30px;
+  border-top: 1px solid #a9bdd4;
+}
+
+.org-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1px solid #a9bdd4;
+}
+
+.org-tree li:only-child::before,
+.org-tree li:only-child::after,
+.org-tree > ul > li::before,
+.org-tree > ul > li::after { display: none; }
+.org-tree li:only-child { padding-top: 0; }
+.org-tree li:first-child::before,
+.org-tree li:last-child::after { border: 0; }
+.org-tree li:last-child::before { border-right: 1px solid #a9bdd4; border-radius: 0 8px 0 0; }
+.org-tree li:first-child::after { border-radius: 8px 0 0 0; }
+.org-tree ul ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 30px;
+  border-left: 1px solid #a9bdd4;
+}
+
+.org-node {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 11px;
+  width: 218px;
+  min-height: 108px;
+  margin: 0 auto;
+  padding: 14px;
+  border: 1px solid #dce5f0;
+  border-top: 4px solid #0f9f86;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.07);
+  text-align: left;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.org-node:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12); }
+.org-node-admin { border-top-color: #0f172a; background: linear-gradient(145deg, #fff, #f0f4fa); }
+.org-node-manager { border-top-color: #7c3aed; }
+.org-node-project_manager { border-top-color: #2a78d6; }
+.org-node-employee { border-top-color: #0f9f86; }
+
+.org-node-avatar,
+.org-unassigned-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #e7f0fb;
+  color: var(--brand-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.org-node-admin .org-node-avatar { color: #fff; background: #0f172a; }
+.org-node-manager .org-node-avatar { color: #6d28d9; background: #f1eafd; }
+.org-node-project_manager .org-node-avatar { color: #1765ad; background: #e7f2ff; }
+.org-node-employee .org-node-avatar { color: #087866; background: #e3f7f2; }
+.org-node-body { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; }
+.org-node-role { margin-bottom: 3px; color: var(--text-soft); font-size: 10.5px; font-weight: 700; }
+.org-node-body strong { max-width: 100%; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.org-node-body small { max-width: 100%; margin-top: 5px; overflow: hidden; color: var(--text-soft); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.org-report-count { margin-top: 7px; padding: 3px 7px; border-radius: 999px; background: #eff4fa; color: #45627e; font-size: 10.5px; }
+.org-tree-empty { margin-top: 22px; color: var(--text-soft); font-size: 13px; text-align: center; }
+
+.organization-unassigned { margin-top: 18px; }
+.org-unassigned-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+.org-unassigned-head h3 { margin: 0; font-size: 16px; }
+.org-unassigned-head p { margin: 4px 0 0; color: var(--text-soft); font-size: 12.5px; }
+.org-unassigned-head > span { flex: none; padding: 5px 10px; border-radius: 999px; background: #fff0d4; color: #946100; font-size: 12px; font-weight: 700; }
+.org-unassigned-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.org-unassigned-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 11px;
+  align-items: center;
+  padding: 13px;
+  border: 1px solid #f0d9ad;
+  border-radius: 13px;
+  background: #fffaf0;
+}
+.org-unassigned-avatar { color: #946100; background: #ffedc7; }
+.org-unassigned-card > div:last-child { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.org-unassigned-card strong { overflow: hidden; font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
+.org-unassigned-card span { color: var(--text-soft); font-size: 11.5px; }
+.org-unassigned-card small { color: #a36500; font-size: 11px; }
+.org-complete { display: flex; align-items: center; gap: 12px; padding: 15px 17px; border: 1px solid #cce8d3; border-radius: 14px; background: #f1fbf4; }
+.org-complete > span { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #d9f2df; color: #15803d; font-weight: 800; }
+.org-complete strong { font-size: 13.5px; }
+.org-complete p { margin: 3px 0 0; color: var(--text-soft); font-size: 12px; }
+
 @media (max-width: 700px) {
   .punch-stage { min-height: 390px; padding-top: 8px; }
   .live-clock { font-size: 48px; letter-spacing: -1px; }
@@ -965,6 +1170,10 @@ tbody tr:last-child td {
   .document-icon { width: 40px; height: 40px; }
   .document-actions { grid-column: 1 / -1; }
   .document-actions .action-btn { flex: 1; }
+  .org-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .organization-tree-wrap { padding: 28px 14px 24px; }
+  .org-unassigned-grid { grid-template-columns: 1fr; }
+  .org-unassigned-head { flex-direction: column; }
 }
 
 /* ---------- Responsive ---------- */
@@ -1000,6 +1209,8 @@ tbody tr:last-child td {
   .form-grid {
     grid-template-columns: 1fr 1fr;
   }
+
+  .org-unassigned-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 600px) {
@@ -1035,6 +1246,9 @@ tbody tr:last-child td {
   .form-grid {
     grid-template-columns: 1fr;
   }
+
+  .org-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .org-unassigned-grid { grid-template-columns: 1fr; }
 
   /* Keep every hierarchy field visible on narrow screens. */
   #settings .table-wrap {

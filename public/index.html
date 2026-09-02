@@ -21,6 +21,7 @@
           <a href="#changes" class="nav-item" data-target="changes" data-access="leaders"><span class="nav-ico">🔔</span>修改上报 <span id="changeBadge" class="nav-badge hidden-by-role">0</span></a>
           <a href="#calendar" class="nav-item" data-target="calendar" data-access="admin"><span class="nav-ico">🗓️</span>考勤日历</a>
           <a href="#employees" class="nav-item" data-target="employees" data-access="admin"><span class="nav-ico">👥</span>员工管理</a>
+          <a href="#organization" class="nav-item" data-target="organization" data-access="admin"><span class="nav-ico">🌳</span>组织架构</a>
           <a href="#summary" class="nav-item" data-target="summary" data-access="admin"><span class="nav-ico">📅</span>月度总结</a>
           <a href="#settings" class="nav-item" data-target="settings" data-access="admin"><span class="nav-ico">⚙️</span>系统设置</a>
         </nav>
@@ -246,6 +247,36 @@
               <tbody id="employeeTableBody"></tbody>
             </table>
           </div>
+        </section>
+
+        <section id="organization" class="panel view">
+          <div class="panel-head">
+            <div>
+              <h2>组织架构</h2>
+              <p class="panel-sub">按照考勤汇报关系展示完整团队层级，未配置直属上级的人员会单独提醒</p>
+            </div>
+            <div class="top-actions">
+              <button id="refreshOrganizationBtn" class="btn-ghost">刷新架构</button>
+              <button id="editOrganizationBtn">调整组织关系</button>
+            </div>
+          </div>
+
+          <div class="org-stats" aria-label="组织架构统计">
+            <div class="org-stat-card"><span class="org-stat-icon manager">◆</span><div><strong id="orgManagerCount">0</strong><span>管理者</span></div></div>
+            <div class="org-stat-card"><span class="org-stat-icon project">●</span><div><strong id="orgProjectCount">0</strong><span>项目管理人</span></div></div>
+            <div class="org-stat-card"><span class="org-stat-icon employee">●</span><div><strong id="orgEmployeeCount">0</strong><span>员工</span></div></div>
+            <div class="org-stat-card"><span class="org-stat-icon configured">✓</span><div><strong id="orgConfiguredCount">0</strong><span>已纳入架构</span></div></div>
+          </div>
+
+          <div class="org-legend" aria-label="组织层级图例">
+            <span><i class="admin"></i>系统管理员</span>
+            <span><i class="manager"></i>管理者</span>
+            <span><i class="project"></i>项目管理人</span>
+            <span><i class="employee"></i>员工</span>
+          </div>
+
+          <div id="organizationTree" class="organization-tree-wrap"></div>
+          <div id="organizationUnassigned" class="organization-unassigned"></div>
         </section>
 
         <section id="summary" class="panel view">
