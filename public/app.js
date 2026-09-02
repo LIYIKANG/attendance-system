@@ -10,6 +10,8 @@ const state = {
   clockState: 'not_started',
   editingEmployeeId: null,
   editingRecordId: null,
+  documentEmployeeId: null,
+  employeeDocuments: [],
   calendarMonth: businessDate().slice(0, 7),
   selectedDate: businessDate(),
   user: JSON.parse(localStorage.getItem('attendance-user') || 'null')
@@ -133,6 +135,17 @@ const elements = {
   currentPassword: $('#currentPassword'),
   newPassword: $('#newPassword'),
   confirmPassword: $('#confirmPassword'),
+  documentModal: $('#documentModal'),
+  documentModalTitle: $('#documentModalTitle'),
+  documentEmployeeName: $('#documentEmployeeName'),
+  closeDocumentModal: $('#closeDocumentModal'),
+  finishDocumentManagement: $('#finishDocumentManagement'),
+  documentType: $('#documentType'),
+  employeeDocumentFile: $('#employeeDocumentFile'),
+  uploadEmployeeDocument: $('#uploadEmployeeDocument'),
+  employeeDocumentList: $('#employeeDocumentList'),
+  resumeDocumentCount: $('#resumeDocumentCount'),
+  contractDocumentCount: $('#contractDocumentCount'),
   editRecordModal: $('#editRecordModal'),
   closeEditModal: $('#closeEditModal'),
   cancelEditRecord: $('#cancelEditRecord'),
@@ -185,9 +198,10 @@ function showToast(message, type = 'success') {
 async function fetchJson(url, options = {}) {
   let response;
   try {
+    const isFormData = options.body instanceof FormData;
     response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...authHeaders(),
         ...options.headers
       },
@@ -365,8 +379,9 @@ function renderEmployees() {
     const meta = EMPLOYMENT_META[employee.employmentType] || EMPLOYMENT_META.parttime;
     const recipient = employee.level === 'manager' ? '系统管理员' : state.employees.find(item => item.id === employee.supervisorId)?.name || '未设置';
     const recipientClass = recipient === '未设置' ? 'pending' : 'complete';
-    return `<tr><td>${escapeHtml(employee.name)}</td><td>${escapeHtml(employee.department || '-')}</td><td>${escapeHtml(employee.position || '-')}</td><td>${levelPill(employee.level)}</td><td><span class="config-state ${recipientClass}">${escapeHtml(recipient)}</span></td><td>${escapeHtml(meta.label)}</td><td>${formatCurrency(employee.baseSalary)}<span class="salary-unit">/${meta.unit}</span></td><td>${escapeHtml(employee.phone || '-')}</td><td><button class="action-btn" data-employee-action="edit" data-id="${employee.id}">编辑</button><button class="action-btn delete" data-employee-action="delete" data-id="${employee.id}">删除</button></td></tr>`;
-  }).join('') : '<tr><td colspan="9" class="empty-cell">暂无员工</td></tr>';
+    const documentCount = Number(employee.documentCount) || 0;
+    return `<tr><td>${escapeHtml(employee.name)}</td><td>${escapeHtml(employee.department || '-')}</td><td>${escapeHtml(employee.position || '-')}</td><td>${levelPill(employee.level)}</td><td><span class="config-state ${recipientClass}">${escapeHtml(recipient)}</span></td><td>${escapeHtml(meta.label)}</td><td>${formatCurrency(employee.baseSalary)}<span class="salary-unit">/${meta.unit}</span></td><td>${escapeHtml(employee.phone || '-')}</td><td><button class="action-btn document-action" data-employee-action="documents" data-id="${employee.id}">资料管理${documentCount ? `<span class="document-count">${documentCount}</span>` : ''}</button></td><td><button class="action-btn" data-employee-action="edit" data-id="${employee.id}">编辑</button><button class="action-btn delete" data-employee-action="delete" data-id="${employee.id}">删除</button></td></tr>`;
+  }).join('') : '<tr><td colspan="10" class="empty-cell">暂无员工</td></tr>';
   elements.employeeSelect.innerHTML = state.employees.map(employee => `<option value="${employee.id}">${escapeHtml(employee.name)}（${escapeHtml(employee.department || '—')}）</option>`).join('');
   renderEmployeeSupervisorOptions(elements.employeeSupervisor.value);
 }
@@ -665,7 +680,7 @@ async function addEmployee() {
 }
 
 async function deleteEmployee(id) {
-  if (!confirm('确定删除该员工吗？其登录账户和原始考勤将被删除，修改审计会继续保留。若仍有下属，需先完成转移。')) return;
+  if (!confirm('确定删除该员工吗？其登录账户、原始考勤、简历和合同将被删除，修改审计会继续保留。若仍有下属，需先完成转移。')) return;
   const data = await fetchJson(`/api/employees/${id}`, {
     method: 'DELETE'
   });
@@ -674,6 +689,115 @@ async function deleteEmployee(id) {
   await loadEmployees();
   await Promise.all([ loadRecords(), loadDashboard(), loadSummary(), loadCalendar() ]);
   showToast('员工已删除');
+}
+
+function formatFileSize(size) {
+  const bytes = Number(size) || 0;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function renderEmployeeDocuments() {
+  const resumeCount = state.employeeDocuments.filter(document => document.documentType === 'resume').length;
+  const contractCount = state.employeeDocuments.filter(document => document.documentType === 'contract').length;
+  elements.resumeDocumentCount.textContent = resumeCount;
+  elements.contractDocumentCount.textContent = contractCount;
+  elements.employeeDocumentList.innerHTML = state.employeeDocuments.length ? state.employeeDocuments.map(document => {
+    const typeLabel = document.documentType === 'contract' ? '劳动合同' : '个人简历';
+    const typeIcon = document.documentType === 'contract' ? '📄' : '🪪';
+    return `<article class="document-item"><div class="document-icon" aria-hidden="true">${typeIcon}</div><div class="document-info"><div><span class="document-type ${document.documentType}">${typeLabel}</span><strong title="${escapeHtml(document.originalName)}">${escapeHtml(document.originalName)}</strong></div><small>${formatFileSize(document.size)} · 上传于 ${formatDateTime(document.uploadedAt)}</small></div><div class="document-actions"><button class="action-btn" data-document-action="download" data-id="${document.id}">下载</button><button class="action-btn delete" data-document-action="delete" data-id="${document.id}">删除</button></div></article>`;
+  }).join('') : '<div class="document-empty"><span>📁</span><strong>暂未上传人员资料</strong><p>选择“个人简历”或“劳动合同”后上传文件。</p></div>';
+}
+
+async function loadEmployeeDocuments(employeeId = state.documentEmployeeId) {
+  const data = await fetchJson(`/api/employees/${employeeId}/documents`);
+  if (!data) return;
+  state.employeeDocuments = data.documents;
+  renderEmployeeDocuments();
+}
+
+async function openDocumentManager(employeeId) {
+  const employee = state.employees.find(item => item.id === employeeId);
+  if (!employee) return;
+  state.documentEmployeeId = employeeId;
+  state.employeeDocuments = [];
+  elements.documentModalTitle.textContent = `${employee.name} · 人员档案`;
+  elements.documentEmployeeName.textContent = '管理员可上传、下载和删除该员工的简历与合同。';
+  elements.documentType.value = 'resume';
+  elements.employeeDocumentFile.value = '';
+  renderEmployeeDocuments();
+  elements.documentModal.classList.add('show');
+  elements.documentModal.setAttribute('aria-hidden', 'false');
+  await loadEmployeeDocuments(employeeId);
+}
+
+function closeDocumentManager() {
+  elements.documentModal.classList.remove('show');
+  elements.documentModal.setAttribute('aria-hidden', 'true');
+  elements.employeeDocumentFile.value = '';
+  state.documentEmployeeId = null;
+  state.employeeDocuments = [];
+}
+
+async function uploadEmployeeDocument() {
+  const file = elements.employeeDocumentFile.files[0];
+  if (!state.documentEmployeeId) return showToast('请先选择员工', 'error');
+  if (!file) return showToast('请选择要上传的文件', 'error');
+  if (file.size > 15 * 1024 * 1024) return showToast('文件不能超过 15MB', 'error');
+  const formData = new FormData();
+  formData.append('file', file);
+  elements.uploadEmployeeDocument.disabled = true;
+  elements.uploadEmployeeDocument.textContent = '上传中…';
+  const data = await fetchJson(`/api/employees/${state.documentEmployeeId}/documents?type=${encodeURIComponent(elements.documentType.value)}`, {
+    method: 'POST',
+    body: formData
+  });
+  elements.uploadEmployeeDocument.disabled = false;
+  elements.uploadEmployeeDocument.textContent = '上传资料';
+  if (!data) return;
+  elements.employeeDocumentFile.value = '';
+  await Promise.all([ loadEmployeeDocuments(), loadEmployees() ]);
+  showToast('人员资料已安全上传');
+}
+
+async function downloadEmployeeDocument(documentId) {
+  const documentInfo = state.employeeDocuments.find(document => document.id === documentId);
+  if (!documentInfo) return;
+  let response;
+  try {
+    response = await fetch(`/api/employee-documents/${documentId}/download`, { headers: authHeaders() });
+  } catch (error) {
+    return showToast('文件下载失败，请稍后重试', 'error');
+  }
+  if (response.status === 401) {
+    localStorage.removeItem('attendance-token');
+    localStorage.removeItem('attendance-user');
+    location.href = '/login.html';
+    return;
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    return showToast(data.message || '文件下载失败', 'error');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = documentInfo.originalName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function deleteEmployeeDocument(documentId) {
+  const documentInfo = state.employeeDocuments.find(document => document.id === documentId);
+  if (!documentInfo || !confirm(`确定删除“${documentInfo.originalName}”吗？删除后无法恢复。`)) return;
+  const data = await fetchJson(`/api/employee-documents/${documentId}`, { method: 'DELETE' });
+  if (!data) return;
+  await Promise.all([ loadEmployeeDocuments(), loadEmployees() ]);
+  showToast('人员资料已删除');
 }
 
 async function clockAction(type) {
@@ -833,6 +957,20 @@ elements.passwordModal.addEventListener('click', event => {
   if (event.target === elements.passwordModal) closePasswordModal();
 });
 
+elements.closeDocumentModal.addEventListener('click', closeDocumentManager);
+elements.finishDocumentManagement.addEventListener('click', closeDocumentManager);
+elements.uploadEmployeeDocument.addEventListener('click', uploadEmployeeDocument);
+elements.documentModal.addEventListener('click', event => {
+  if (event.target === elements.documentModal) closeDocumentManager();
+});
+elements.employeeDocumentList.addEventListener('click', event => {
+  const button = event.target.closest('[data-document-action]');
+  if (!button) return;
+  const documentId = Number(button.dataset.id);
+  if (button.dataset.documentAction === 'download') downloadEmployeeDocument(documentId);
+  else deleteEmployeeDocument(documentId);
+});
+
 elements.employmentType.addEventListener('change', updateSalaryLabel);
 
 elements.employeeLevel.addEventListener('change', () => renderEmployeeSupervisorOptions());
@@ -851,6 +989,8 @@ elements.employeeTableBody.addEventListener('click', event => {
       top: 0,
       behavior: 'smooth'
     });
+  } else if (button.dataset.employeeAction === 'documents') {
+    openDocumentManager(id);
   } else deleteEmployee(id);
 });
 

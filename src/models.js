@@ -63,4 +63,15 @@ const SystemSetting = sequelize.define('SystemSetting', {
   currency: { type: DataTypes.STRING, defaultValue: 'CNY' }
 });
 
-module.exports = { Employee, User, AttendanceRecord, AttendanceChange, SystemSetting };
+const EmployeeDocument = sequelize.define('EmployeeDocument', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  employeeId: { type: DataTypes.INTEGER, allowNull: false },
+  documentType: { type: DataTypes.STRING, allowNull: false },
+  originalName: { type: DataTypes.STRING, allowNull: false },
+  storedName: { type: DataTypes.STRING, allowNull: false, unique: true },
+  mimeType: { type: DataTypes.STRING, allowNull: false },
+  size: { type: DataTypes.INTEGER, allowNull: false },
+  uploadedAt: { type: DataTypes.DATE, allowNull: false }
+});
+
+module.exports = { Employee, User, AttendanceRecord, AttendanceChange, SystemSetting, EmployeeDocument };

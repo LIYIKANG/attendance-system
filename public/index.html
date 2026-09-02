@@ -239,6 +239,7 @@
                   <th>用工类型</th>
                   <th>工资</th>
                   <th>电话</th>
+                  <th>人员档案</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -336,6 +337,41 @@
         <div class="form-group"><label for="newPassword">新密码</label><input id="newPassword" type="password" autocomplete="new-password" /></div>
         <div class="form-group"><label for="confirmPassword">确认新密码</label><input id="confirmPassword" type="password" autocomplete="new-password" /></div>
         <div class="modal-actions"><button id="cancelPasswordChange" class="btn-ghost">取消</button><button id="savePasswordChange">保存新密码</button></div>
+      </div>
+    </div>
+
+    <div id="documentModal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card document-card" role="dialog" aria-modal="true" aria-labelledby="documentModalTitle">
+        <div class="modal-head">
+          <div>
+            <h3 id="documentModalTitle">人员档案</h3>
+            <p id="documentEmployeeName">管理员可上传、下载和删除该员工的简历与合同。</p>
+          </div>
+          <button id="closeDocumentModal" class="modal-close" aria-label="关闭">×</button>
+        </div>
+
+        <div class="document-upload-panel">
+          <div class="form-group">
+            <label for="documentType">资料类型</label>
+            <select id="documentType">
+              <option value="resume">个人简历</option>
+              <option value="contract">劳动合同</option>
+            </select>
+          </div>
+          <div class="form-group document-file-field">
+            <label for="employeeDocumentFile">选择文件</label>
+            <input id="employeeDocumentFile" type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
+          </div>
+          <button id="uploadEmployeeDocument" class="document-upload-btn">上传资料</button>
+        </div>
+        <p class="document-upload-hint">支持 PDF、Word、PNG、JPG，单个文件不超过 15MB。人员资料不会进入 Git 仓库。</p>
+
+        <div class="document-summary" aria-label="档案统计">
+          <span><strong id="resumeDocumentCount">0</strong> 份简历</span>
+          <span><strong id="contractDocumentCount">0</strong> 份合同</span>
+        </div>
+        <div id="employeeDocumentList" class="document-list"></div>
+        <div class="modal-actions"><button id="finishDocumentManagement" class="btn-ghost">完成</button></div>
       </div>
     </div>
 

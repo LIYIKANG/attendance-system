@@ -5,3 +5,4 @@ npm-debug.log
 .gitignore
 .DS_Store
 coverage
+data/uploads

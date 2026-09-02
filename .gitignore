@@ -7,6 +7,7 @@ node_modules/
 
 # 本地数据（含员工信息与密码散列，不提交到仓库）
 data/db.json
+data/uploads/
 
 # 日志与系统文件
 *.log

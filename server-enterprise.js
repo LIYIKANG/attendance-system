@@ -3,20 +3,53 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
+const multer = require('multer');
 const { sequelize } = require('./src/db');
-const { Employee, User, AttendanceRecord, AttendanceChange, SystemSetting } = require('./src/models');
+const { Employee, User, AttendanceRecord, AttendanceChange, SystemSetting, EmployeeDocument } = require('./src/models');
 
 const app = express();
 if (String(process.env.TRUST_PROXY).toLowerCase() === 'true') app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
 const DATA_FILE = path.join(ROOT_DIR, 'data', 'db.json');
+const UPLOAD_DIR = path.join(ROOT_DIR, 'data', 'uploads');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const TOKEN_SECRET = process.env.JWT_SECRET || 'attendance-enterprise-secret-2026';
 const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
 const BUSINESS_TIME_ZONE = 'Asia/Shanghai';
 const EMPLOYEE_LEVELS = ['employee', 'project_manager', 'manager'];
+const DOCUMENT_TYPES = ['resume', 'contract'];
+const DOCUMENT_EXTENSIONS = new Set(['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg']);
+const DOCUMENT_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/png',
+  'image/jpeg'
+]);
 let STORE_MODE = 'json';
+
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const documentStorage = multer.diskStorage({
+  destination: (_req, _file, callback) => callback(null, UPLOAD_DIR),
+  filename: (_req, file, callback) => {
+    const extension = path.extname(file.originalname || '').toLowerCase();
+    callback(null, `${Date.now()}-${crypto.randomBytes(16).toString('hex')}${extension}`);
+  }
+});
+
+const documentUpload = multer({
+  storage: documentStorage,
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    const extension = path.extname(file.originalname || '').toLowerCase();
+    if (!DOCUMENT_EXTENSIONS.has(extension) || !DOCUMENT_MIME_TYPES.has(file.mimetype)) {
+      return callback(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'file'));
+    }
+    return callback(null, true);
+  }
+});
 
 app.disable('x-powered-by');
 app.use((req, res, next) => {
@@ -98,7 +131,8 @@ function buildDefaultDb() {
       { id: 4, username: 'wangwu', fullName: '王五', role: 'employee', employeeId: 3, tokenVersion: 0, passwordHash: DEFAULT_EMPLOYEE_PASSWORD_HASH }
     ],
     records: [],
-    attendanceChanges: []
+    attendanceChanges: [],
+    employeeDocuments: []
   };
 }
 
@@ -136,6 +170,19 @@ function normalizeDbStructure(db) {
       readReceipts
     };
   });
+  const employeeDocuments = (Array.isArray(db?.employeeDocuments) ? db.employeeDocuments : [])
+    .filter((document) => employees.some((employee) => employee.id === Number(document.employeeId)))
+    .map((document) => ({
+      ...document,
+      employeeId: Number(document.employeeId),
+      documentType: DOCUMENT_TYPES.includes(document.documentType) ? document.documentType : 'resume',
+      originalName: String(document.originalName || '未命名文件'),
+      storedName: path.basename(String(document.storedName || '')),
+      mimeType: String(document.mimeType || 'application/octet-stream'),
+      size: Math.max(Number(document.size) || 0, 0),
+      uploadedAt: document.uploadedAt || new Date().toISOString()
+    }))
+    .filter((document) => document.storedName);
   const normalized = {
     ...defaultDb,
     ...db,
@@ -146,7 +193,8 @@ function normalizeDbStructure(db) {
       ...record,
       breaks: Array.isArray(record.breaks) ? record.breaks : []
     })),
-    attendanceChanges
+    attendanceChanges,
+    employeeDocuments
   };
 
   if (!normalized.users.some((user) => user.username === 'admin')) {
@@ -220,11 +268,12 @@ async function initStorage() {
 
 async function loadStore() {
   if (STORE_MODE === 'mysql') {
-    const [employees, users, records, attendanceChanges, settings] = await Promise.all([
+    const [employees, users, records, attendanceChanges, employeeDocuments, settings] = await Promise.all([
       Employee.findAll({ order: [['id', 'ASC']] }),
       User.findAll({ order: [['id', 'ASC']] }),
       AttendanceRecord.findAll({ order: [['date', 'DESC']] }),
       AttendanceChange.findAll({ order: [['changedAt', 'DESC']] }),
+      EmployeeDocument.findAll({ order: [['uploadedAt', 'DESC']] }),
       SystemSetting.findOne({ where: { id: 1 } })
     ]);
 
@@ -233,6 +282,7 @@ async function loadStore() {
       users: users.map((item) => item.toJSON()),
       records: records.map((item) => item.toJSON()),
       attendanceChanges: attendanceChanges.map((item) => item.toJSON()),
+      employeeDocuments: employeeDocuments.map((item) => item.toJSON()),
       settings: settings?.toJSON() || buildDefaultDb().settings
     });
   }
@@ -242,13 +292,14 @@ async function loadStore() {
 
 async function saveStore(nextStore) {
   if (STORE_MODE === 'mysql') {
-    const { employees, users, records, attendanceChanges, settings } = nextStore;
+    const { employees, users, records, attendanceChanges, employeeDocuments, settings } = nextStore;
     await sequelize.transaction(async (transaction) => {
       await Promise.all([
         Promise.all(employees.map((employee) => Employee.upsert(employee, { transaction }))),
         Promise.all(users.map((user) => User.upsert(user, { transaction }))),
         Promise.all(records.map((record) => AttendanceRecord.upsert(record, { transaction }))),
         Promise.all((attendanceChanges || []).map((change) => AttendanceChange.upsert(change, { transaction }))),
+        Promise.all((employeeDocuments || []).map((document) => EmployeeDocument.upsert(document, { transaction }))),
         SystemSetting.upsert({ id: 1, ...settings }, { transaction })
       ]);
     });
@@ -265,12 +316,14 @@ async function deleteEmployeeFromStore(employeeId) {
       if (!employee) return null;
       const reports = await Employee.findAll({ where: { supervisorId: employeeId }, transaction });
       if (reports.length) return { blocked: true, reportNames: reports.map((item) => item.name) };
+      const documents = await EmployeeDocument.findAll({ where: { employeeId }, transaction });
 
       await AttendanceRecord.destroy({ where: { employeeId }, transaction });
       await AttendanceChange.update({ subjectName: employee.name, subjectLevel: employeeLevel(employee) }, { where: { subjectEmployeeId: employeeId }, transaction });
+      await EmployeeDocument.destroy({ where: { employeeId }, transaction });
       await User.destroy({ where: { employeeId }, transaction });
       await employee.destroy({ transaction });
-      return { deleted: true };
+      return { deleted: true, storedNames: documents.map((document) => document.storedName) };
     });
   }
 
@@ -279,12 +332,65 @@ async function deleteEmployeeFromStore(employeeId) {
   if (employeeIndex === -1) return null;
   const reports = store.employees.filter((employee) => employee.supervisorId === employeeId);
   if (reports.length) return { blocked: true, reportNames: reports.map((employee) => employee.name) };
+  const storedNames = store.employeeDocuments.filter((document) => document.employeeId === employeeId).map((document) => document.storedName);
 
   store.employees.splice(employeeIndex, 1);
   store.records = store.records.filter((record) => record.employeeId !== employeeId);
   store.users = store.users.filter((user) => user.employeeId !== employeeId);
+  store.employeeDocuments = store.employeeDocuments.filter((document) => document.employeeId !== employeeId);
   writeJsonStore(store);
-  return { deleted: true };
+  return { deleted: true, storedNames };
+}
+
+function removeStoredDocument(storedName) {
+  if (!storedName) return;
+  const safeName = path.basename(String(storedName));
+  const filePath = path.join(UPLOAD_DIR, safeName);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (error) {
+    console.warn(`Unable to remove employee document ${safeName}:`, error.message);
+  }
+}
+
+function publicEmployeeDocument(document) {
+  return {
+    id: document.id,
+    employeeId: document.employeeId,
+    documentType: document.documentType,
+    originalName: document.originalName,
+    mimeType: document.mimeType,
+    size: document.size,
+    uploadedAt: document.uploadedAt
+  };
+}
+
+async function deleteEmployeeDocumentFromStore(documentId) {
+  if (STORE_MODE === 'mysql') {
+    const document = await EmployeeDocument.findByPk(documentId);
+    if (!document) return null;
+    const storedName = document.storedName;
+    await document.destroy();
+    return { storedName };
+  }
+
+  const store = readJsonStore();
+  const index = store.employeeDocuments.findIndex((document) => document.id === documentId);
+  if (index === -1) return null;
+  const [document] = store.employeeDocuments.splice(index, 1);
+  writeJsonStore(store);
+  return { storedName: document.storedName };
+}
+
+function uploadSingleDocument(req, res, next) {
+  documentUpload.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ message: '文件不能超过 15MB' });
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ message: '仅支持 PDF、Word、PNG 和 JPG 文件' });
+    }
+    return res.status(400).json({ message: '文件上传失败，请重新选择文件' });
+  });
 }
 
 function nextId(items) {
@@ -712,7 +818,80 @@ app.put('/api/settings', requireAdmin, async (req, res) => {
 
 app.get('/api/employees', requireAdmin, async (req, res) => {
   const store = await loadStore();
-  return res.json({ employees: store.employees });
+  const counts = new Map();
+  store.employeeDocuments.forEach((document) => counts.set(document.employeeId, (counts.get(document.employeeId) || 0) + 1));
+  return res.json({ employees: store.employees.map((employee) => ({ ...employee, documentCount: counts.get(employee.id) || 0 })) });
+});
+
+app.get('/api/employees/:id/documents', requireAdmin, async (req, res) => {
+  const employeeId = Number(req.params.id);
+  if (!Number.isSafeInteger(employeeId) || employeeId <= 0) return res.status(400).json({ message: '员工编号无效' });
+  const store = await loadStore();
+  const employee = store.employees.find((item) => item.id === employeeId);
+  if (!employee) return res.status(404).json({ message: '未找到该员工' });
+  const documents = store.employeeDocuments
+    .filter((document) => document.employeeId === employeeId)
+    .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
+    .map(publicEmployeeDocument);
+  return res.json({ employee: { id: employee.id, name: employee.name }, documents });
+});
+
+app.post('/api/employees/:id/documents', requireAdmin, async (req, res, next) => {
+  const employeeId = Number(req.params.id);
+  const documentType = String(req.query.type || '');
+  if (!Number.isSafeInteger(employeeId) || employeeId <= 0) return res.status(400).json({ message: '员工编号无效' });
+  if (!DOCUMENT_TYPES.includes(documentType)) return res.status(400).json({ message: '请选择简历或合同类型' });
+  const store = await loadStore();
+  const employee = store.employees.find((item) => item.id === employeeId);
+  if (!employee) return res.status(404).json({ message: '未找到该员工' });
+  req.employeeDocumentContext = { employeeId, documentType };
+  return uploadSingleDocument(req, res, next);
+}, async (req, res, next) => {
+  if (!req.file) return res.status(400).json({ message: '请选择要上传的文件' });
+  const { employeeId, documentType } = req.employeeDocumentContext;
+  try {
+    const store = await loadStore();
+    if (!store.employees.some((employee) => employee.id === employeeId)) {
+      removeStoredDocument(req.file.filename);
+      return res.status(404).json({ message: '未找到该员工' });
+    }
+    const document = {
+      id: nextId(store.employeeDocuments),
+      employeeId,
+      documentType,
+      originalName: path.basename(String(req.file.originalname || '未命名文件')).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 255) || '未命名文件',
+      storedName: req.file.filename,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+      uploadedAt: new Date().toISOString()
+    };
+    store.employeeDocuments.push(document);
+    await saveStore(store);
+    return res.status(201).json({ document: publicEmployeeDocument(document) });
+  } catch (error) {
+    removeStoredDocument(req.file.filename);
+    return next(error);
+  }
+});
+
+app.get('/api/employee-documents/:id/download', requireAdmin, async (req, res) => {
+  const documentId = Number(req.params.id);
+  if (!Number.isSafeInteger(documentId) || documentId <= 0) return res.status(400).json({ message: '文件编号无效' });
+  const store = await loadStore();
+  const document = store.employeeDocuments.find((item) => item.id === documentId);
+  if (!document) return res.status(404).json({ message: '未找到该文件' });
+  const filePath = path.join(UPLOAD_DIR, path.basename(document.storedName));
+  if (!fs.existsSync(filePath)) return res.status(404).json({ message: '文件内容不存在，请重新上传' });
+  return res.download(filePath, document.originalName);
+});
+
+app.delete('/api/employee-documents/:id', requireAdmin, async (req, res) => {
+  const documentId = Number(req.params.id);
+  if (!Number.isSafeInteger(documentId) || documentId <= 0) return res.status(400).json({ message: '文件编号无效' });
+  const result = await deleteEmployeeDocumentFromStore(documentId);
+  if (!result) return res.status(404).json({ message: '未找到该文件' });
+  removeStoredDocument(result.storedName);
+  return res.json({ message: '文件已删除' });
 });
 
 app.put('/api/hierarchy', requireAdmin, async (req, res) => {
@@ -876,6 +1055,8 @@ app.delete('/api/employees/:id', requireAdmin, async (req, res) => {
   if (result.blocked) {
     return res.status(409).json({ message: `请先为以下下属重新指定直属上级：${result.reportNames.join('、')}` });
   }
+
+  (result.storedNames || []).forEach(removeStoredDocument);
 
   return res.json({ message: 'Employee deleted' });
 });
